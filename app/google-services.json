@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "731792479210",
+    "project_id": "pc01-cb62c",
+    "storage_bucket": "pc01-cb62c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:731792479210:android:fdceb75678a5c434f41893",
+        "android_client_info": {
+          "package_name": "dev.erick.pc1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1fBMLMoXDQw_PNcaIY5cs1fbWv5arvQI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
