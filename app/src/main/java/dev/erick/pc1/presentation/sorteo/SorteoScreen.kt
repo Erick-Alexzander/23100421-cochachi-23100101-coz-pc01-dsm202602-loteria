@@ -18,10 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.erick.pc1.data.model.BolillaModel
 import dev.erick.pc1.data.model.JugadaModel
-
 /**
  * Pantalla de seguimiento del sorteo.
- * 
+ *
  * @param sorteoId El ID del sorteo a observar (proveniente de la selección anterior).
  * @param jugada La jugada del usuario (proporcionada por FirebaseJugadaManager, responsabilidad de Braulio).
  * @param viewModel ViewModel encargado de la lógica de aciertos y conexión a Firestore.
@@ -137,7 +136,7 @@ fun SorteoContent(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -158,7 +157,7 @@ fun SorteoContent(
         )
 
         val numerosSorteados = state.bolillas.map { it.numero }.toSet()
-        
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -183,7 +182,7 @@ fun SorteoContent(
             Spacer(modifier = Modifier.height(16.dp))
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = if (state.resultadoDefinitivo == "GANADOR") 
+                    containerColor = if (state.resultadoDefinitivo == "GANADOR")
                         Color(0xFF4CAF50) else MaterialTheme.colorScheme.secondaryContainer
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -192,7 +191,7 @@ fun SorteoContent(
                     text = state.resultadoDefinitivo,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.resultadoDefinitivo == "GANADOR") 
+                    color = if (state.resultadoDefinitivo == "GANADOR")
                         Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -212,14 +211,14 @@ fun BolillaItem(bolilla: BolillaModel?, orden: Int) {
                 .size(48.dp)
                 .clip(CircleShape)
                 .background(
-                    if (bolilla != null) MaterialTheme.colorScheme.primary 
+                    if (bolilla != null) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.surfaceVariant
                 ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = bolilla?.numero?.toString() ?: "?",
-                color = if (bolilla != null) MaterialTheme.colorScheme.onPrimary 
+                color = if (bolilla != null) MaterialTheme.colorScheme.onPrimary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold

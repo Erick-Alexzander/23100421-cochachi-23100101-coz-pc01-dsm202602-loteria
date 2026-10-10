@@ -2,12 +2,14 @@ package dev.erick.pc1.data.remote
 
 import android.util.Log
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.tasks.await
 
 class FirebaseJugadaManager(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
 
     companion object {
@@ -17,6 +19,7 @@ class FirebaseJugadaManager(
     suspend fun getActiveSorteo(): Result<Pair<String, Map<String, Any>>?> {
         return try {
             val snapshot = firestore.collection("sorteos")
+                .whereEqualTo("estado", "abierto")
                 .limit(1)
                 .get()
                 .await()
@@ -60,11 +63,26 @@ class FirebaseJugadaManager(
 
     suspend fun saveJugada(sorteoId: String, uid: String, numeros: List<Int>): Result<Unit> {
         return try {
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                return Result.failure(Exception("Usuario no autenticado."))
+            }
+            if (currentUser.uid != uid) {
+                return Result.failure(Exception("El UID especificado no coincide con el usuario autenticado."))
+            }
+
+            if (numeros.size != 6) {
+                return Result.failure(Exception("La jugada debe contener exactamente 6 números."))
+            }
+
             val sorteoDoc = firestore.collection("sorteos").document(sorteoId).get().await()
-            val estado = sorteoDoc.getString("estado") ?: "abierto"
-            
-            if (estado.equals("finalizado", ignoreCase = true) || estado.equals("cerrado", ignoreCase = true)) {
-                return Result.failure(Exception("El sorteo ya comenzó o finalizó. No se pueden registrar jugadas."))
+            if (!sorteoDoc.exists()) {
+                return Result.failure(Exception("El sorteo con ID '$sorteoId' no existe en Firestore."))
+            }
+
+            val estado = sorteoDoc.getString("estado")
+            if (estado != "abierto") {
+                return Result.failure(Exception("El sorteo no está abierto para registrar jugadas (estado actual: '${estado ?: "nulo"}')."))
             }
 
             val jugadaRef = firestore.collection("sorteos")

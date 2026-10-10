@@ -1,50 +1,82 @@
 package dev.erick.pc1.presentation.navigation
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import dev.erick.pc1.data.model.JugadaModel
+import dev.erick.pc1.data.remote.FirebaseJugadaManager
 import dev.erick.pc1.presentation.auth.LoginScreen
 import dev.erick.pc1.presentation.auth.RegisterScreen
 import dev.erick.pc1.presentation.home.HomeScreen
 import dev.erick.pc1.presentation.jugada.JugadaScreen
+import dev.erick.pc1.presentation.sorteo.SorteoScreen
+
+private const val ROUTE_LOGIN = "login"
+private const val ROUTE_REGISTER = "register"
+private const val ROUTE_HOME = "home"
+private const val ROUTE_JUGADA = "jugada"
+private const val ROUTE_SORTEO = "sorteo"
+
+private const val SORTEO_ID = "sorteos_001"
 
 @Composable
 fun AppNavGraph() {
     val navController = rememberNavController()
     val currentUser = FirebaseAuth.getInstance().currentUser
-    val startDestination = if (currentUser != null) "home" else "login"
+
+    val startDestination =
+        if (currentUser != null) ROUTE_HOME else ROUTE_LOGIN
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        composable("login") {
+        composable(ROUTE_LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(ROUTE_HOME) {
+                        popUpTo(ROUTE_LOGIN) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 },
                 onNavigateToRegister = {
-                    navController.navigate("register")
+                    navController.navigate(ROUTE_REGISTER)
                 }
             )
         }
 
-        composable("register") {
+        composable(ROUTE_REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    navController.navigate("home") {
-                        popUpTo("register") { inclusive = true }
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(ROUTE_HOME) {
+                        popUpTo(ROUTE_LOGIN) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 },
                 onNavigateBack = {
@@ -53,23 +85,27 @@ fun AppNavGraph() {
             )
         }
 
-        composable("home") {
+        composable(ROUTE_HOME) {
             HomeScreen(
                 onNavigateToJugada = {
-                    navController.navigate("jugada")
+                    navController.navigate(ROUTE_JUGADA)
                 },
                 onNavigateToSorteo = {
-                    navController.navigate("sorteo")
+                    navController.navigate(ROUTE_SORTEO)
                 },
                 onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
+                    FirebaseAuth.getInstance().signOut()
+                    navController.navigate(ROUTE_LOGIN) {
+                        popUpTo(ROUTE_HOME) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        composable("jugada") {
+        composable(ROUTE_JUGADA) {
             JugadaScreen(
                 onBack = {
                     navController.popBackStack()
@@ -77,56 +113,117 @@ fun AppNavGraph() {
             )
         }
 
-        // Ruta de Sorteo (Integración con el módulo/pantalla de Erick: SorteoScreen)
-        composable("sorteo") {
-            SorteoPlaceholderScreen(
-                onBack = {
-                    navController.popBackStack()
-                }
+        composable(ROUTE_SORTEO) {
+            SorteoRoute(
+                navController = navController
             )
         }
     }
 }
 
-/**
- * Placeholder temporal para la pantalla de Sorteo (SorteoScreen.kt a cargo de Erick).
- * Una vez que Erick implemente SorteoScreen, se puede enlazar aquí directamente.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SorteoPlaceholderScreen(onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Seguimiento del Sorteo") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
+private fun SorteoRoute(
+    navController: NavHostController
+) {
+    val currentUser = FirebaseAuth.getInstance().currentUser
+
+    if (currentUser == null) {
+        LaunchedEffect(Unit) {
+            navController.navigate(ROUTE_LOGIN) {
+                popUpTo(ROUTE_HOME) {
+                    inclusive = true
+                }
+            }
         }
-    ) { innerPadding ->
+        return
+    }
+
+    var jugada by remember(currentUser.uid) {
+        mutableStateOf<JugadaModel?>(null)
+    }
+
+    var cargando by remember(currentUser.uid) {
+        mutableStateOf(true)
+    }
+
+    var error by remember(currentUser.uid) {
+        mutableStateOf<String?>(null)
+    }
+
+    LaunchedEffect(currentUser.uid) {
+        cargando = true
+        error = null
+
+        try {
+            val resultado = FirebaseJugadaManager()
+                .getJugada(SORTEO_ID, currentUser.uid)
+
+            resultado.fold(
+                onSuccess = { numeros ->
+                    jugada = numeros?.let {
+                        JugadaModel(
+                            uidUsuario = currentUser.uid,
+                            sorteoId = SORTEO_ID,
+                            numeros = it
+                        )
+                    }
+
+                    if (jugada == null) {
+                        error = "Todavía no tienes una jugada registrada para este sorteo."
+                    }
+                },
+                onFailure = { exception ->
+                    error = exception.localizedMessage
+                        ?: "No se pudo recuperar tu jugada de Firebase."
+                }
+            )
+        } catch (exception: Exception) {
+            error = exception.localizedMessage
+                ?: "Ocurrió un error al consultar tu jugada."
+        } finally {
+            cargando = false
+        }
+    }
+
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "Pantalla de Sorteo en desarrollo",
-                fontSize = 20.sp,
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Esta sección corresponde a Erick (FirebaseSorteoManager y SorteoScreen). Estará integrada tras el merge.",
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onBack) {
-                Text("Volver")
+            when {
+                cargando -> {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(12.dp))
+                    Text("Cargando tu jugada...")
+                }
+
+                jugada != null -> {
+                    SorteoScreen(
+                        sorteoId = SORTEO_ID,
+                        jugada = jugada!!
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = error ?: "No se encontró tu jugada.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            navController.popBackStack()
+                        }
+                    ) {
+                        Text("Volver")
+                    }
+                }
             }
         }
     }

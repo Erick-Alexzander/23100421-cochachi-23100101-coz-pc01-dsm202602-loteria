@@ -53,15 +53,19 @@ fun JugadaScreen(
                     activeSorteoId = pair.first
                     sorteoEstado = pair.second["estado"] as? String ?: "abierto"
 
-                    val jugadaResult = jugadaManager.getJugada(activeSorteoId!!, uid)
-                    if (jugadaResult.isSuccess) {
-                        val jugada = jugadaResult.getOrNull()
-                        if (jugada != null) {
-                            existingJugada = jugada
+                    if (sorteoEstado != "abierto") {
+                        message = "El sorteo actual no se encuentra abierto (estado: '$sorteoEstado')."
+                    } else {
+                        val jugadaResult = jugadaManager.getJugada(activeSorteoId!!, uid)
+                        if (jugadaResult.isSuccess) {
+                            val jugada = jugadaResult.getOrNull()
+                            if (jugada != null) {
+                                existingJugada = jugada
+                            }
                         }
                     }
                 } else {
-                    message = "No hay sorteos activos disponibles."
+                    message = "No hay sorteos abiertos disponibles."
                 }
             } else {
                 message = "Error al cargar el sorteo activo."
@@ -216,7 +220,7 @@ fun JugadaScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = selectedNumbers.size == 6 && !isSaving && activeSorteoId != null
+                    enabled = selectedNumbers.size == 6 && !isSaving && activeSorteoId != null && sorteoEstado == "abierto"
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
