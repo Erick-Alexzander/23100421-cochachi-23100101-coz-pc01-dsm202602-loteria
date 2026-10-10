@@ -1,5 +1,6 @@
 package dev.erick.pc1.presentation.jugada
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import dev.erick.pc1.data.remote.FirebaseAuthManager
 import dev.erick.pc1.data.remote.FirebaseJugadaManager
 import kotlinx.coroutines.launch
@@ -22,11 +24,14 @@ import kotlinx.coroutines.launch
 fun JugadaScreen(
     onBack: () -> Unit
 ) {
+    val TAG = "JugadaScreen"
     val authManager = remember { FirebaseAuthManager() }
     val jugadaManager = remember { FirebaseJugadaManager() }
     val coroutineScope = rememberCoroutineScope()
 
+    val currentUser = FirebaseAuth.getInstance().currentUser
     val uid = authManager.getCurrentUserId()
+    Log.d(TAG, "JugadaScreen initialized. CurrentUser isNull: ${currentUser == null}, UID: $uid")
 
     var activeSorteoId by remember { mutableStateOf<String?>(null) }
     var sorteoEstado by remember { mutableStateOf("abierto") }
@@ -41,30 +46,42 @@ fun JugadaScreen(
     LaunchedEffect(Unit) {
         coroutineScope.launch {
             if (uid == null) {
+                Log.w(TAG, "LaunchedEffect: UID is null. User not authenticated.")
                 message = "Usuario no autenticado."
                 isLoading = false
                 return@launch
             }
 
+            Log.d(TAG, "LaunchedEffect: Calling getActiveSorteo()...")
             val sorteoResult = jugadaManager.getActiveSorteo()
             if (sorteoResult.isSuccess) {
                 val pair = sorteoResult.getOrNull()
                 if (pair != null) {
                     activeSorteoId = pair.first
                     sorteoEstado = pair.second["estado"] as? String ?: "abierto"
+                    Log.d(TAG, "LaunchedEffect: Active sorteo loaded successfully. SorteoId: $activeSorteoId, Estado: $sorteoEstado")
 
+                    Log.d(TAG, "LaunchedEffect: Calling getJugada(sorteoId=$activeSorteoId, uid=$uid)...")
                     val jugadaResult = jugadaManager.getJugada(activeSorteoId!!, uid)
                     if (jugadaResult.isSuccess) {
                         val jugada = jugadaResult.getOrNull()
                         if (jugada != null) {
                             existingJugada = jugada
+                            Log.d(TAG, "LaunchedEffect: Existing jugada found: $jugada")
+                        } else {
+                            Log.d(TAG, "LaunchedEffect: No existing jugada found for this user.")
                         }
+                    } else {
+                        Log.e(TAG, "LaunchedEffect: getJugada failed: ${jugadaResult.exceptionOrNull()?.localizedMessage}")
                     }
                 } else {
+                    Log.w(TAG, "LaunchedEffect: getActiveSorteo returned null (no sorteos found).")
                     message = "No hay sorteos activos disponibles."
                 }
             } else {
-                message = "Error al cargar el sorteo activo."
+                val err = sorteoResult.exceptionOrNull()
+                Log.e(TAG, "LaunchedEffect: getActiveSorteo failed: ${err?.localizedMessage}", err)
+                message = "Error al cargar el sorteo activo: ${err?.localizedMessage}"
             }
             isLoading = false
         }
